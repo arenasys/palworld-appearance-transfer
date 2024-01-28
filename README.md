@@ -8,7 +8,7 @@ Discord: [Arena Systems](https://discord.gg/WdjKqUGefU).
 ## About
 Small tool using [UESave](https://github.com/trumank/uesave-rs) to transfer the player appearance from one save file to another. Automatically backs up saves before editing (but manual backups are still recommended).
 
-Download [here](https://github.com/arenasys/PalworldAppearanceTransfer/raw/master/PalTransfer.exe) and run. Dont run as Admin.
+Download [here](https://github.com/arenasys/palworld-appearance-transfer/releases/download/v1.0/PalTransfer.zip), extract and run. Dont run as Admin.
 
 ## Notes
 Only the name for the main player of a world can be extracted (UESave limitation?), other players in the world will use their hexadecimal file names.
