@@ -13,7 +13,7 @@ Download [here](https://github.com/arenasys/palworld-appearance-transfer/release
 ## Notes
 Only the name for the main player of a world can be extracted (UESave limitation?), other players in the world will use their hexadecimal file names.
 Looks for a save folder in the usual `AppData\Local\Pal\Saved\SavedGames` or if there is a `SavedGames` folder next to the exe it uses that instead.
-Backups and the UESave binary are stored in `AppData\Local\PalTransfer`.
+Backups are stored in `AppData\Local\PalTransfer`.
 
 ## Backups
 Select the source world to be `Backup` and source player to be the specific backup file. Then find the correct destination and press Apply. Backups are the full original file and will replace the destination save file completely (not just appearance).

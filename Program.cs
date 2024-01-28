@@ -282,7 +282,7 @@ namespace Editor
             var ids = Directory.GetDirectories(saveLocation);
             foreach (var id in ids)
             {
-                var worlds = Directory.GetDirectories(Path.Combine(saveLocation, id));
+                var worlds = Directory.GetDirectories(id);
                 foreach (var world in worlds)
                 {
                     var worldJson = ReadSave(Path.Combine(world, "LevelMeta.sav"));
@@ -290,7 +290,7 @@ namespace Editor
                     var playerName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["HostPlayerName"]["Str"]["value"]);
                     names[world] = worldName;
 
-                    var players = Directory.GetFiles(Path.Combine(saveLocation, id, world, "Players"));
+                    var players = Directory.GetFiles(Path.Combine(world, "Players"));
 
                     foreach (var player in players)
                     {

@@ -131,7 +131,7 @@
   <ItemGroup>
     <Content Include="icon.ico" />
     <None Include="uesave.exe">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
