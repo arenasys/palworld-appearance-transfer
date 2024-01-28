@@ -21,13 +21,15 @@ namespace Editor
         {
             if (dialog == null)
             {
-                new Thread(delegate ()
+                var thread = new Thread(delegate ()
                 {
                     dialog = new Dialog();
                     dialog.Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
                     Application.Run(dialog);
                     dialog = null;
-                }).Start();
+                });
+                thread.SetApartmentState(ApartmentState.STA);
+                thread.Start();
 
                 while (dialog == null)
                 {
@@ -213,7 +215,7 @@ namespace Editor
             }
             catch (Exception e)
             {
-                LaunchError("Preparation Failed: " + e.Message);
+                LaunchError("Preparation Failed: " + e.Message + "\n" + e.StackTrace);
                 dialog.SetLabel("Failed");
                 return;
             }
@@ -224,7 +226,7 @@ namespace Editor
             }
             catch (Exception e)
             {
-                LaunchError("Saving Failed: " + e.Message);
+                LaunchError("Saving Failed: " + e.Message + "\n" + e.StackTrace);
                 dialog.SetLabel("Failed");
                 return;
             }
@@ -234,19 +236,19 @@ namespace Editor
 
         public void Refresh()
         {
-            try
+            new Thread(delegate ()
             {
-                new Thread(delegate ()
+                try
                 {
                     Populate();
-                }).Start();
-            }
-            catch (Exception e)
-            {
-                LaunchError("Refresh Failed: " + e.Message);
-                dialog.SetLabel("Failed");
-                return;
-            }
+                }
+                catch (Exception e)
+                {
+                    LaunchError("Refresh Failed: " + e.Message + "\n" + e.StackTrace);
+                    dialog.SetLabel("Failed");
+                    return;
+                }
+            }).Start();
         }
 
         public void Populate()
@@ -285,10 +287,19 @@ namespace Editor
                 var worlds = Directory.GetDirectories(id);
                 foreach (var world in worlds)
                 {
-                    var worldJson = ReadSave(Path.Combine(world, "LevelMeta.sav"));
-                    var worldName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["WorldName"]["Str"]["value"]);
-                    var playerName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["HostPlayerName"]["Str"]["value"]);
-                    names[world] = worldName;
+                    string worldName;
+                    string playerName;
+                    try
+                    {
+                        var worldJson = ReadSave(Path.Combine(world, "LevelMeta.sav"));
+                        worldName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["WorldName"]["Str"]["value"]);
+                        playerName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["HostPlayerName"]["Str"]["value"]);
+                        names[world] = worldName;
+                    } catch(Exception e)
+                    {
+                        LaunchError("World Failed (" + world + "): " + e.Message + "\n" + e.StackTrace);
+                        continue;
+                    }
 
                     var players = Directory.GetFiles(Path.Combine(world, "Players"));
 
@@ -323,24 +334,42 @@ namespace Editor
             dialog.SetSaves(saves, names);
             dialog.SetLabel("Idle");
         }
+
+        public string Pick()
+        {
+            var picker = new OpenFileDialog()
+            {
+                FileName = "Select a save file",
+                Filter = "Save files (*.sav)|*.sav",
+                Title = "Open save file"
+            };
+            picker.ShowDialog();
+            return picker.FileName;
+        }
         public void Work(string[] args)
         {
-            var exe = Assembly.GetEntryAssembly().Location;
-            var exe_dir = Path.GetDirectoryName(exe);
-            Directory.SetCurrentDirectory(exe_dir);
-            LaunchDialog();
-
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            this.dataFolder = Path.Combine(appData, "PalTransfer");
-
-            dialog.transferCallback = Transfer;
-            dialog.refreshCallback = Refresh;
-
-            Refresh();
-
-            while(dialog != null)
+            try
             {
-                Thread.Sleep(10);
+                var exe = Assembly.GetEntryAssembly().Location;
+                var exe_dir = Path.GetDirectoryName(exe);
+                Directory.SetCurrentDirectory(exe_dir);
+                LaunchDialog();
+
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                this.dataFolder = Path.Combine(appData, "PalTransfer");
+
+                dialog.transferCallback = Transfer;
+                dialog.refreshCallback = Refresh;
+
+                Refresh();
+
+                while (dialog != null)
+                {
+                    Thread.Sleep(10);
+                }
+            } catch(Exception e)
+            {
+                LaunchError("Unhandled Error: " + e.Message + "\n" + e.StackTrace);
             }
         }
     }

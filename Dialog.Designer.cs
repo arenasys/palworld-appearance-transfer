@@ -47,7 +47,6 @@ namespace Editor
                 DoLock();
             }
         }
-
         public void PopulateWorlds(ComboBox worlds)
         {
             worlds.Items.Clear();
@@ -73,13 +72,28 @@ namespace Editor
 
         public void DoLock()
         {
-            transferButton.Enabled = ((srcWorld.SelectedIndex != dstWorld.SelectedIndex) || (srcPlayer.SelectedIndex != dstPlayer.SelectedIndex));
+            if (manualCheck.Enabled)
+            {
+                transferButton.Enabled = srcInput.Text.Length != 0 && dstInput.Text.Length != 0;
+            }
+            else
+            {
+                transferButton.Enabled = ((srcWorld.SelectedIndex != dstWorld.SelectedIndex) || (srcPlayer.SelectedIndex != dstPlayer.SelectedIndex));
+            }
         }
 
         public void DoTransfer()
         {
             string srcSave = ((string[])this.saves[srcWorld.SelectedIndex])[this.srcPlayer.SelectedIndex];
             string dstSave = ((string[])this.saves[dstWorld.SelectedIndex])[this.dstPlayer.SelectedIndex];
+
+            this.transferCallback.Invoke(srcSave, dstSave);
+        }
+
+        public void DoManualTransfer()
+        {
+            string srcSave = this.srcInput.Text;
+            string dstSave = this.dstInput.Text;
 
             this.transferCallback.Invoke(srcSave, dstSave);
         }
@@ -128,7 +142,7 @@ namespace Editor
             this.dstPlayerLabel = new System.Windows.Forms.Label();
             this.dstWorldLabel = new System.Windows.Forms.Label();
             this.transferButton = new System.Windows.Forms.Button();
-            this.sourceBox = new System.Windows.Forms.GroupBox();
+            this.srcBox = new System.Windows.Forms.GroupBox();
             this.srcPlayer = new System.Windows.Forms.ComboBox();
             this.srcPlayerLabel = new System.Windows.Forms.Label();
             this.srcWorld = new System.Windows.Forms.ComboBox();
@@ -137,10 +151,21 @@ namespace Editor
             this.statusBar = new System.Windows.Forms.StatusStrip();
             this.statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
             this.actionBox = new System.Windows.Forms.GroupBox();
+            this.manualCheck = new System.Windows.Forms.CheckBox();
+            this.dstManualBox = new System.Windows.Forms.GroupBox();
+            this.dstOpen = new System.Windows.Forms.Button();
+            this.dstInput = new System.Windows.Forms.TextBox();
+            this.dstManualLabel = new System.Windows.Forms.Label();
+            this.srcManualBox = new System.Windows.Forms.GroupBox();
+            this.srcOpen = new System.Windows.Forms.Button();
+            this.srcManualLabel = new System.Windows.Forms.Label();
+            this.srcInput = new System.Windows.Forms.TextBox();
             this.dstBox.SuspendLayout();
-            this.sourceBox.SuspendLayout();
+            this.srcBox.SuspendLayout();
             this.statusBar.SuspendLayout();
             this.actionBox.SuspendLayout();
+            this.dstManualBox.SuspendLayout();
+            this.srcManualBox.SuspendLayout();
             this.SuspendLayout();
             // 
             // dstBox
@@ -201,24 +226,24 @@ namespace Editor
             this.transferButton.Enabled = false;
             this.transferButton.Location = new System.Drawing.Point(11, 19);
             this.transferButton.Name = "transferButton";
-            this.transferButton.Size = new System.Drawing.Size(333, 23);
+            this.transferButton.Size = new System.Drawing.Size(264, 23);
             this.transferButton.TabIndex = 4;
             this.transferButton.Text = "Transfer";
             this.transferButton.UseVisualStyleBackColor = true;
             this.transferButton.Click += new System.EventHandler(this.transferButton_Click);
             // 
-            // sourceBox
+            // srcBox
             // 
-            this.sourceBox.Controls.Add(this.srcPlayer);
-            this.sourceBox.Controls.Add(this.srcPlayerLabel);
-            this.sourceBox.Controls.Add(this.srcWorld);
-            this.sourceBox.Controls.Add(this.srcWorldLabel);
-            this.sourceBox.Location = new System.Drawing.Point(12, 73);
-            this.sourceBox.Name = "sourceBox";
-            this.sourceBox.Size = new System.Drawing.Size(477, 55);
-            this.sourceBox.TabIndex = 5;
-            this.sourceBox.TabStop = false;
-            this.sourceBox.Text = "Source";
+            this.srcBox.Controls.Add(this.srcPlayer);
+            this.srcBox.Controls.Add(this.srcPlayerLabel);
+            this.srcBox.Controls.Add(this.srcWorld);
+            this.srcBox.Controls.Add(this.srcWorldLabel);
+            this.srcBox.Location = new System.Drawing.Point(12, 73);
+            this.srcBox.Name = "srcBox";
+            this.srcBox.Size = new System.Drawing.Size(477, 55);
+            this.srcBox.TabIndex = 5;
+            this.srcBox.TabStop = false;
+            this.srcBox.Text = "Source";
             // 
             // srcPlayer
             // 
@@ -262,9 +287,9 @@ namespace Editor
             // 
             // refreshButton
             // 
-            this.refreshButton.Location = new System.Drawing.Point(350, 19);
+            this.refreshButton.Location = new System.Drawing.Point(281, 19);
             this.refreshButton.Name = "refreshButton";
-            this.refreshButton.Size = new System.Drawing.Size(115, 23);
+            this.refreshButton.Size = new System.Drawing.Size(117, 23);
             this.refreshButton.TabIndex = 4;
             this.refreshButton.Text = "Refresh";
             this.refreshButton.UseVisualStyleBackColor = true;
@@ -276,7 +301,7 @@ namespace Editor
             this.statusLabel});
             this.statusBar.Location = new System.Drawing.Point(0, 202);
             this.statusBar.Name = "statusBar";
-            this.statusBar.Size = new System.Drawing.Size(498, 22);
+            this.statusBar.Size = new System.Drawing.Size(503, 22);
             this.statusBar.SizingGrip = false;
             this.statusBar.TabIndex = 6;
             this.statusBar.Text = "statusStrip1";
@@ -292,6 +317,7 @@ namespace Editor
             // 
             // actionBox
             // 
+            this.actionBox.Controls.Add(this.manualCheck);
             this.actionBox.Controls.Add(this.transferButton);
             this.actionBox.Controls.Add(this.refreshButton);
             this.actionBox.Location = new System.Drawing.Point(12, 134);
@@ -301,14 +327,107 @@ namespace Editor
             this.actionBox.TabStop = false;
             this.actionBox.Text = "Actions";
             // 
+            // manualCheck
+            // 
+            this.manualCheck.AutoSize = true;
+            this.manualCheck.Location = new System.Drawing.Point(404, 23);
+            this.manualCheck.Name = "manualCheck";
+            this.manualCheck.Size = new System.Drawing.Size(61, 17);
+            this.manualCheck.TabIndex = 5;
+            this.manualCheck.Text = "Manual";
+            this.manualCheck.UseVisualStyleBackColor = true;
+            this.manualCheck.CheckedChanged += new System.EventHandler(this.manualCheck_CheckedChanged);
+            // 
+            // dstManualBox
+            // 
+            this.dstManualBox.Controls.Add(this.dstOpen);
+            this.dstManualBox.Controls.Add(this.dstInput);
+            this.dstManualBox.Controls.Add(this.dstManualLabel);
+            this.dstManualBox.Location = new System.Drawing.Point(12, 12);
+            this.dstManualBox.Name = "dstManualBox";
+            this.dstManualBox.Size = new System.Drawing.Size(477, 55);
+            this.dstManualBox.TabIndex = 5;
+            this.dstManualBox.TabStop = false;
+            this.dstManualBox.Text = "Destination";
+            this.dstManualBox.Visible = false;
+            // 
+            // dstOpen
+            // 
+            this.dstOpen.Location = new System.Drawing.Point(387, 22);
+            this.dstOpen.Name = "dstOpen";
+            this.dstOpen.Size = new System.Drawing.Size(78, 22);
+            this.dstOpen.TabIndex = 4;
+            this.dstOpen.Text = "Open";
+            this.dstOpen.UseVisualStyleBackColor = true;
+            this.dstOpen.Click += new System.EventHandler(this.dstOpen_Click);
+            // 
+            // dstInput
+            // 
+            this.dstInput.Location = new System.Drawing.Point(53, 23);
+            this.dstInput.Name = "dstInput";
+            this.dstInput.Size = new System.Drawing.Size(328, 20);
+            this.dstInput.TabIndex = 3;
+            this.dstInput.TextChanged += new System.EventHandler(this.dstInput_TextChanged);
+            // 
+            // dstManualLabel
+            // 
+            this.dstManualLabel.AutoSize = true;
+            this.dstManualLabel.Location = new System.Drawing.Point(11, 26);
+            this.dstManualLabel.Name = "dstManualLabel";
+            this.dstManualLabel.Size = new System.Drawing.Size(36, 13);
+            this.dstManualLabel.TabIndex = 2;
+            this.dstManualLabel.Text = "Player";
+            // 
+            // srcManualBox
+            // 
+            this.srcManualBox.Controls.Add(this.srcOpen);
+            this.srcManualBox.Controls.Add(this.srcManualLabel);
+            this.srcManualBox.Controls.Add(this.srcInput);
+            this.srcManualBox.Location = new System.Drawing.Point(12, 73);
+            this.srcManualBox.Name = "srcManualBox";
+            this.srcManualBox.Size = new System.Drawing.Size(477, 55);
+            this.srcManualBox.TabIndex = 6;
+            this.srcManualBox.TabStop = false;
+            this.srcManualBox.Text = "Source";
+            this.srcManualBox.Visible = false;
+            // 
+            // srcOpen
+            // 
+            this.srcOpen.Location = new System.Drawing.Point(387, 20);
+            this.srcOpen.Name = "srcOpen";
+            this.srcOpen.Size = new System.Drawing.Size(78, 22);
+            this.srcOpen.TabIndex = 7;
+            this.srcOpen.Text = "Open";
+            this.srcOpen.UseVisualStyleBackColor = true;
+            this.srcOpen.Click += new System.EventHandler(this.srcOpen_Click);
+            // 
+            // srcManualLabel
+            // 
+            this.srcManualLabel.AutoSize = true;
+            this.srcManualLabel.Location = new System.Drawing.Point(11, 24);
+            this.srcManualLabel.Name = "srcManualLabel";
+            this.srcManualLabel.Size = new System.Drawing.Size(36, 13);
+            this.srcManualLabel.TabIndex = 5;
+            this.srcManualLabel.Text = "Player";
+            // 
+            // srcInput
+            // 
+            this.srcInput.Location = new System.Drawing.Point(53, 21);
+            this.srcInput.Name = "srcInput";
+            this.srcInput.Size = new System.Drawing.Size(328, 20);
+            this.srcInput.TabIndex = 6;
+            this.srcInput.TextChanged += new System.EventHandler(this.srcInput_TextChanged);
+            // 
             // Dialog
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(498, 224);
+            this.ClientSize = new System.Drawing.Size(503, 224);
+            this.Controls.Add(this.srcManualBox);
+            this.Controls.Add(this.dstManualBox);
             this.Controls.Add(this.actionBox);
             this.Controls.Add(this.statusBar);
-            this.Controls.Add(this.sourceBox);
+            this.Controls.Add(this.srcBox);
             this.Controls.Add(this.dstBox);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -317,11 +436,16 @@ namespace Editor
             this.Text = "Palworld Appearance Transfer";
             this.dstBox.ResumeLayout(false);
             this.dstBox.PerformLayout();
-            this.sourceBox.ResumeLayout(false);
-            this.sourceBox.PerformLayout();
+            this.srcBox.ResumeLayout(false);
+            this.srcBox.PerformLayout();
             this.statusBar.ResumeLayout(false);
             this.statusBar.PerformLayout();
             this.actionBox.ResumeLayout(false);
+            this.actionBox.PerformLayout();
+            this.dstManualBox.ResumeLayout(false);
+            this.dstManualBox.PerformLayout();
+            this.srcManualBox.ResumeLayout(false);
+            this.srcManualBox.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -334,7 +458,7 @@ namespace Editor
         private Label dstWorldLabel;
         private Button transferButton;
         private ComboBox dstPlayer;
-        private GroupBox sourceBox;
+        private GroupBox srcBox;
         private ComboBox srcPlayer;
         private Label srcPlayerLabel;
         private ComboBox srcWorld;
@@ -344,6 +468,15 @@ namespace Editor
         private GroupBox actionBox;
         private ToolStripStatusLabel statusLabel;
         private ComboBox dstWorld;
+        private CheckBox manualCheck;
+        private GroupBox dstManualBox;
+        private Button dstOpen;
+        private TextBox dstInput;
+        private Label dstManualLabel;
+        private GroupBox srcManualBox;
+        private Button srcOpen;
+        private Label srcManualLabel;
+        private TextBox srcInput;
     }
 }
 
