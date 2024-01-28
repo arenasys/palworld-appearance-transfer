@@ -58,7 +58,7 @@ namespace Editor
                 data = os.ToArray();
             }
 
-            if(type == 0x32)
+            if (type == 0x32)
             {
                 byte[] tmp = new byte[raw.Length - 2];
                 Array.Copy(data, 2, tmp, 0, tmp.Length);
@@ -92,7 +92,7 @@ namespace Editor
             MemoryStream s = new MemoryStream();
 
             s.Write(BitConverter.GetBytes((uint)raw.Length), 0, 4);
-            s.Write(BitConverter.GetBytes((uint)compressed.Length+2), 0, 4);
+            s.Write(BitConverter.GetBytes((uint)compressed.Length + 2), 0, 4);
             s.Write(new byte[] { 0x50, 0x6C, 0x5A, 0x31 }, 0, 4);
             s.Write(compressed, 0, compressed.Length);
 
@@ -206,7 +206,7 @@ namespace Editor
                     dialog.SetLabel("Restored");
                     return;
                 }
-            
+
                 var srcSave = ReadSave(srcFile);
                 dstSave = ReadSave(dstFile);
 
@@ -295,7 +295,8 @@ namespace Editor
                         worldName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["WorldName"]["Str"]["value"]);
                         playerName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["HostPlayerName"]["Str"]["value"]);
                         names[world] = worldName;
-                    } catch(Exception e)
+                    }
+                    catch (Exception e)
                     {
                         LaunchError("World Failed (" + world + "): " + e.Message + "\n" + e.StackTrace);
                         continue;
@@ -367,7 +368,8 @@ namespace Editor
                 {
                     Thread.Sleep(10);
                 }
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
                 LaunchError("Unhandled Error: " + e.Message + "\n" + e.StackTrace);
             }
