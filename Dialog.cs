@@ -78,7 +78,7 @@ namespace Editor
 
         public void DoLock()
         {
-            if (manualCheck.Enabled)
+            if (manualCheck.Checked)
             {
                 transferButton.Enabled = srcInput.Text.Length != 0 && dstInput.Text.Length != 0;
             }
