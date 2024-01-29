@@ -6,7 +6,7 @@
 Discord: [Arena Systems](https://discord.gg/WdjKqUGefU).
 
 ## About
-Small tool using [UESave](https://github.com/trumank/uesave-rs) to transfer the player appearance from one save file to another. Automatically backs up saves before editing (but manual backups are still recommended).
+Small tool using [Palworld UESave](https://github.com/DKingAlpha/palworld-uesave-rs) to transfer the player appearance from one save file to another. Automatically backs up saves before editing (but manual backups are still recommended).
 
 Download [here](https://github.com/arenasys/palworld-appearance-transfer/releases/download/v1.0/PalTransfer.zip), extract and run. Dont run as Admin.
 
