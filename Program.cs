@@ -16,6 +16,9 @@ namespace Editor
     {
         private Dialog dialog;
         private string dataFolder;
+        private string tmpFolder;
+        private string backupFolder;
+        private string saveFolder;
 
         private void LaunchDialog()
         {
@@ -43,175 +46,27 @@ namespace Editor
             MessageBox.Show(error, "Error occurred", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-        public byte[] Decompress(byte[] raw)
+        public void DoTransfer(string srcFile, string dstFile)
         {
-            int type = raw[11];
+            int saveType;
 
-            byte[] data = new byte[raw.Length - 12];
-            Array.Copy(raw, 12, data, 0, data.Length);
-
-            using (MemoryStream ms = new MemoryStream(data, 0, data.Length))
-            using (MemoryStream os = new MemoryStream())
-            using (var ds = new ZlibStream(ms, CompressionMode.Decompress))
-            {
-                ds.CopyTo(os);
-                data = os.ToArray();
-            }
-
-            if (type == 0x32)
-            {
-                byte[] tmp = new byte[raw.Length - 2];
-                Array.Copy(data, 2, tmp, 0, tmp.Length);
-
-                using (MemoryStream ms = new MemoryStream(tmp, 0, tmp.Length))
-                using (MemoryStream os = new MemoryStream())
-                using (var ds = new ZlibStream(ms, CompressionMode.Decompress))
-                {
-                    ds.CopyTo(os);
-                    data = os.ToArray();
-                }
-            }
-
-            return data;
-        }
-
-        public byte[] Compress(byte[] raw)
-        {
-            byte[] compressed;
-
-            using (MemoryStream ms = new MemoryStream(raw, 0, raw.Length))
-            using (MemoryStream os = new MemoryStream())
-            {
-                using (var ds = new ZlibStream(os, CompressionMode.Compress))
-                {
-                    ms.CopyTo(ds);
-                }
-                compressed = os.ToArray();
-            }
-
-            MemoryStream s = new MemoryStream();
-
-            s.Write(BitConverter.GetBytes((uint)raw.Length), 0, 4);
-            s.Write(BitConverter.GetBytes((uint)compressed.Length + 2), 0, 4);
-            s.Write(new byte[] { 0x50, 0x6C, 0x5A, 0x31 }, 0, 4);
-            s.Write(compressed, 0, compressed.Length);
-
-            byte[] data = s.ToArray();
-
-            return data;
-        }
-
-        public dynamic ReadSave(string saveFile)
-        {
-            var uesave = Path.GetFullPath("uesave.exe");
-            var tmpGVAS = Path.Combine(this.dataFolder, "tmp", "tmp_r.gvas");
-            var tmpJSON = Path.Combine(this.dataFolder, "tmp", "tmp_r.json");
-
-            File.Delete(tmpGVAS);
-            File.Delete(tmpJSON);
-
-            byte[] fileData = Decompress(File.ReadAllBytes(saveFile));
-
-            File.WriteAllBytes(tmpGVAS, fileData);
-
-            ProcessStartInfo startInfo = new ProcessStartInfo(uesave)
-            {
-                WorkingDirectory = this.dataFolder,
-                Arguments = String.Format("to-json --input {0} --output {1}", tmpGVAS, tmpJSON),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            Process process = new Process
-            {
-                StartInfo = startInfo
-            };
-
-            process.Start();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                var error = "UESave read error: " + process.StandardError.ReadToEnd();
-                LaunchError(error);
-                dialog.SetLabel("Failed");
-                throw new Exception(error);
-            }
-
-            var saveString = File.ReadAllText(tmpJSON);
-            var save = JsonConvert.DeserializeObject(saveString);
-
-            return save;
-        }
-
-        public void WriteSave(dynamic save, string saveFile)
-        {
-            var saveString = JsonConvert.SerializeObject(save, Formatting.Indented);
-
-            var uesave = Path.Combine(Path.GetFullPath("uesave.exe"));
-            var tmpGVAS = Path.Combine(this.dataFolder, "tmp", "tmp_w.gvas");
-            var tmpJSON = Path.Combine(this.dataFolder, "tmp", "tmp_w.json");
-
-            File.Delete(tmpGVAS);
-            File.Delete(tmpJSON);
-
-            File.WriteAllText(tmpJSON, saveString);
-
-            ProcessStartInfo startInfo = new ProcessStartInfo(uesave)
-            {
-                WorkingDirectory = dataFolder,
-                Arguments = String.Format("from-json --input {0} --output {1}", tmpJSON, tmpGVAS),
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-
-            Process process = new Process
-            {
-                StartInfo = startInfo
-            };
-
-            process.Start();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                var error = "UESave read error: " + process.StandardError.ReadToEnd();
-                LaunchError(error);
-                dialog.SetLabel("Failed");
-                throw new Exception(error);
-            }
-
-            byte[] fileData = Compress(File.ReadAllBytes(tmpGVAS));
-
-            File.WriteAllBytes(saveFile, fileData);
-        }
-
-        public void Transfer(string srcFile, string dstFile)
-        {
-            dialog.SetLabel("Saving...");
-
-            dynamic dstSave = null;
+            byte[] srcSave = null;
+            byte[] dstSave = null;
             try
             {
                 var backupFile = DateTime.Now.ToString("dd_MM_yyyy-HH_mm_ss-ff") + ".bak.sav";
-                File.Copy(dstFile, Path.Combine(this.dataFolder, "backup", backupFile));
+                File.Copy(dstFile, Path.Combine(backupFolder, backupFile));
 
                 if (srcFile.EndsWith(".bak.sav"))
                 {
                     File.Copy(srcFile, dstFile, true);
-                    dialog.SetLabel("Restored");
                     return;
                 }
 
-                var srcSave = ReadSave(srcFile);
-                dstSave = ReadSave(dstFile);
+                (srcSave, saveType) = Palworld.ReadSave(srcFile, tmpFolder);
+                (dstSave, saveType) = Palworld.ReadSave(dstFile, tmpFolder);
 
-                var srcAppearance = srcSave["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["PlayerCharacterMakeData"];
-                dstSave["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["PlayerCharacterMakeData"] = srcAppearance;
+                dstSave = Palworld.TransferAppearance(dstSave, srcSave);
             }
             catch (Exception e)
             {
@@ -222,7 +77,7 @@ namespace Editor
 
             try
             {
-                WriteSave(dstSave, dstFile);
+                Palworld.WriteSave(dstSave, dstFile, tmpFolder, saveType);
             }
             catch (Exception e)
             {
@@ -234,119 +89,205 @@ namespace Editor
             dialog.SetLabel("Saved");
         }
 
+        public void Transfer(string srcFile, string dstFile)
+        {
+            new Thread(delegate ()
+            {
+                DoTransfer(srcFile, dstFile);
+                Thread.Sleep(1000);
+                GC.Collect();
+            }).Start();
+        }
+
+        public static void CopyAll(DirectoryInfo source, DirectoryInfo target)
+        {
+            Directory.CreateDirectory(target.FullName);
+
+            foreach (FileInfo fi in source.GetFiles())
+            {
+                fi.CopyTo(Path.Combine(target.FullName, fi.Name), true);
+            }
+
+            foreach (DirectoryInfo diSourceSubDir in source.GetDirectories())
+            {
+                DirectoryInfo nextTargetSubDir = target.CreateSubdirectory(diSourceSubDir.Name);
+                CopyAll(diSourceSubDir, nextTargetSubDir);
+            }
+        }
+
+        public void DoRename(string world, string oldName, string newName)
+        {
+            try
+            {
+                var worldFile = Path.Combine(world, "Level.sav");
+                var worldName = Path.GetFileName(world);
+
+                dialog.SetLabel("Backing up...");
+                var worldBackup = Path.Combine(backupFolder, DateTime.Now.ToString("dd_MM_yyyy-HH_mm_ss-ff"), worldName);
+                CopyAll(new DirectoryInfo(world), new DirectoryInfo(worldBackup));
+
+                dialog.SetLabel("Reading...");
+                (byte[] worldJson, int saveType) = Palworld.ReadSave(worldFile, tmpFolder);
+
+                dialog.SetLabel("Renaming...");
+                byte[] newWorldJson = Palworld.RenamePlayer(worldJson, oldName, newName);
+
+                dialog.SetLabel("Writing...");
+                Palworld.WriteSave(newWorldJson, worldFile, tmpFolder, saveType);
+
+                dialog.SetLabel("Saved");
+            }
+            catch (Exception e)
+            {
+                LaunchError("Rename Failed: " + e.Message + "\n" + e.StackTrace);
+                dialog.SetLabel("Failed");
+                return;
+            }
+        }
+
+        public void Rename(string world, string oldName, string newName)
+        {
+            new Thread(delegate ()
+            {
+                DoRename(world, oldName, newName);
+                Thread.Sleep(1000);
+                GC.Collect();
+            }).Start();
+        }
+        public void DoRefresh()
+        {
+            try
+            {
+                dialog.SetLabel("Reading...");
+
+                Directory.CreateDirectory(this.dataFolder);
+
+                var uesave = Path.GetFullPath("uesave.exe");
+                if (!File.Exists(uesave))
+                {
+                    LaunchError("Failed to find uesave.exe!");
+                    return;
+                }
+
+                OrderedDictionary saves = new OrderedDictionary();
+                OrderedDictionary names = new OrderedDictionary();
+
+                var ids = Directory.GetDirectories(saveFolder);
+                foreach (var id in ids)
+                {
+                    var worlds = Directory.GetDirectories(id);
+                    foreach (var world in worlds)
+                    {
+                        string worldName = Path.GetFileName(world);
+                        Dictionary<string, string> playerNames = new Dictionary<string, string>();
+                        try
+                        {
+                            var worldMetadataFile = Path.Combine(world, "LevelMeta.sav");
+                            if (File.Exists(worldMetadataFile))
+                            {
+                                (var worldMetadataJson, _) = Palworld.ReadSave(Path.Combine(world, "LevelMeta.sav"), tmpFolder);
+                                string playerName;
+                                (worldName, playerName) = Palworld.InspectWorldMetadata(worldMetadataJson);
+                                playerNames["00000000000000000000000000000001"] = playerName;
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            LaunchError("World Failed: " + e.Message + "\n" + e.StackTrace);
+                            dialog.SetLabel("Failed");
+                            return;
+                        }
+
+                        try
+                        {
+                            var players = Directory.GetFiles(Path.Combine(world, "Players"));
+
+                            if (players.Length > 1) // Multiplayer, so actually inspect the world save.
+                            {
+                                try
+                                {
+                                    dialog.SetLabel(String.Format("Reading {0}...", worldName));
+                                    var worldFile = Path.Combine(world, "Level.sav");
+
+                                    {
+                                        (byte[] worldJson, int saveType) = Palworld.ReadSave(worldFile, tmpFolder);
+
+                                        var worldPlayers = Palworld.InspectWorld(worldJson);
+                                        foreach (var entry in worldPlayers)
+                                        {
+                                            playerNames[entry.Key] = entry.Value;
+                                        }
+                                    }
+                                    GC.Collect();
+                                }
+                                catch (Exception e)
+                                { Console.WriteLine(e.StackTrace); }
+                            }
+
+                            foreach (var player in players)
+                            {
+                                var playerFilename = Path.GetFileName(player).Split('.')[0];
+
+                                if (playerNames.ContainsKey(playerFilename))
+                                {
+                                    names[player] = playerNames[playerFilename];
+                                }
+                                else
+                                {
+                                    names[player] = playerFilename;
+                                }
+                            }
+
+                            names[world] = worldName;
+                            saves[world] = players;
+                        }
+                        catch { }
+                    }
+                }
+
+                var backups = Directory.GetFiles(backupFolder);
+                if (backups.Length != 0)
+                {
+                    saves["backup"] = backups;
+                    names["backup"] = "Backup";
+                    foreach (var entry in (string[])saves["backup"])
+                    {
+                        names[entry] = Path.GetFileName(entry).Split('.')[0];
+                    }
+                }
+
+                dialog.SetSaves(saves, names);
+                dialog.SetLabel("Idle");
+            }
+            catch (Exception e)
+            {
+                LaunchError("Refresh Failed: " + e.Message + "\n" + e.StackTrace);
+                dialog.SetLabel("Failed");
+                return;
+            }
+        }
         public void Refresh()
         {
             new Thread(delegate ()
             {
-                try
-                {
-                    Populate();
-                }
-                catch (Exception e)
-                {
-                    LaunchError("Refresh Failed: " + e.Message + "\n" + e.StackTrace);
-                    dialog.SetLabel("Failed");
-                    return;
-                }
+                DoRefresh();
+                Thread.Sleep(1000);
+                GC.Collect();
             }).Start();
         }
 
-        public void Populate()
+        public void Open(string type)
         {
-            dialog.SetLabel("Reading...");
-
-            Directory.CreateDirectory(this.dataFolder);
-            Directory.CreateDirectory(Path.Combine(this.dataFolder, "tmp"));
-            Directory.CreateDirectory(Path.Combine(this.dataFolder, "backup"));
-
-            var uesave = Path.GetFullPath("uesave.exe");
-            if (!File.Exists(uesave))
+            if (type == "saves")
             {
-                LaunchError("Failed to find uesave.exe!");
-                return;
+                Process.Start("explorer.exe", this.saveFolder);
             }
-
-            var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var saveLocation = "SaveGames";
-            if (!Directory.Exists(saveLocation))
+            else if(type == "backups")
             {
-                saveLocation = Path.Combine(appData, "Pal", "Saved", "SaveGames");
-                if (!Directory.Exists(saveLocation))
-                {
-                    LaunchError("Failed to find save location!");
-                    return;
-                }
+                Process.Start("explorer.exe", this.backupFolder);
             }
-
-            OrderedDictionary saves = new OrderedDictionary();
-            OrderedDictionary names = new OrderedDictionary();
-
-            var ids = Directory.GetDirectories(saveLocation);
-            foreach (var id in ids)
-            {
-                var worlds = Directory.GetDirectories(id);
-                foreach (var world in worlds)
-                {
-                    string worldName;
-                    string playerName;
-                    try
-                    {
-                        var worldJson = ReadSave(Path.Combine(world, "LevelMeta.sav"));
-                        worldName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["WorldName"]["Str"]["value"]);
-                        playerName = ((string)worldJson["root"]["properties"]["SaveData"]["Struct"]["value"]["Struct"]["HostPlayerName"]["Str"]["value"]);
-                        names[world] = worldName;
-                    }
-                    catch (Exception e)
-                    {
-                        LaunchError("World Failed (" + world + "): " + e.Message + "\n" + e.StackTrace);
-                        continue;
-                    }
-
-                    var players = Directory.GetFiles(Path.Combine(world, "Players"));
-
-                    foreach (var player in players)
-                    {
-                        var playerFilename = Path.GetFileName(player);
-                        if (playerFilename == "00000000000000000000000000000001.sav")
-                        {
-                            names[player] = playerName;
-                        }
-                        else
-                        {
-                            names[player] = playerFilename.Split('.')[0];
-                        }
-                    }
-
-                    saves[world] = players;
-                }
-            }
-
-            var backups = Directory.GetFiles(Path.Combine(this.dataFolder, "backup"));
-            if (backups.Length != 0)
-            {
-                saves["backup"] = backups;
-                names["backup"] = "Backup";
-                foreach (var entry in (string[])saves["backup"])
-                {
-                    names[entry] = Path.GetFileName(entry).Split('.')[0];
-                }
-            }
-
-            dialog.SetSaves(saves, names);
-            dialog.SetLabel("Idle");
         }
 
-        public string Pick()
-        {
-            var picker = new OpenFileDialog()
-            {
-                FileName = "Select a save file",
-                Filter = "Save files (*.sav)|*.sav",
-                Title = "Open save file"
-            };
-            picker.ShowDialog();
-            return picker.FileName;
-        }
         public void Work(string[] args)
         {
             try
@@ -358,9 +299,24 @@ namespace Editor
 
                 var appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 this.dataFolder = Path.Combine(appData, "PalTransfer");
+                this.tmpFolder = Path.Combine(this.dataFolder, "tmp");
+                this.backupFolder = Path.Combine(this.dataFolder, "backup");
+
+                this.saveFolder = "SaveGames";
+                if (!Directory.Exists(this.saveFolder))
+                {
+                    this.saveFolder = Path.Combine(appData, "Pal", "Saved", "SaveGames");
+                    if (!Directory.Exists(this.saveFolder))
+                    {
+                        LaunchError("Failed to find save location!");
+                        return;
+                    }
+                }
 
                 dialog.transferCallback = Transfer;
                 dialog.refreshCallback = Refresh;
+                dialog.renameCallback = Rename;
+                dialog.openCallback = Open;
 
                 Refresh();
 
@@ -368,6 +324,8 @@ namespace Editor
                 {
                     Thread.Sleep(10);
                 }
+
+                Environment.Exit(0);
             }
             catch (Exception e)
             {

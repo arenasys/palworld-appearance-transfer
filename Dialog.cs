@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Windows.Forms;
 using System.Collections;
 using System.Collections.Specialized;
@@ -10,16 +11,35 @@ namespace Editor
         public Dialog()
         {
             InitializeComponent();
+
+            this.Width = 516;
+
+            dstManualBox.Top = dstBox.Top;
+            dstManualBox.Left = dstBox.Left;
+            srcManualBox.Top = srcBox.Top;
+            srcManualBox.Left = srcBox.Left;
+
+            dstNameBox.Top = dstBox.Top;
+            dstNameBox.Left = dstBox.Left;
+            srcNameBox.Top = srcBox.Top;
+            srcNameBox.Left = srcBox.Left;
         }
 
         private OrderedDictionary saves;
         private OrderedDictionary names;
+        private bool working = false;
 
         public delegate void TransferCallback(string srcSave, string dstSave);
         public TransferCallback transferCallback;
 
         public delegate void RefreshCallback();
         public RefreshCallback refreshCallback;
+
+        public delegate void RenameCallback(string worldFolder, string oldName, string newName);
+        public RenameCallback renameCallback;
+
+        public delegate void OpenCallback(string type);
+        public OpenCallback openCallback;
 
         delegate void SetLabelCallback(string value);
         public void SetLabel(string value)
@@ -32,6 +52,7 @@ namespace Editor
             else
             {
                 this.statusLabel.Text = value;
+                SetWorking(value.EndsWith("..."));
             }
         }
 
@@ -48,16 +69,21 @@ namespace Editor
                 this.saves = saves;
                 this.names = names;
 
-                PopulateWorlds(dstWorld);
+                PopulateWorlds(dstWorld, includeBackup: false);
                 PopulateWorlds(srcWorld);
+                PopulateWorlds(dstNameWorld, includeBackup: false);
                 DoLock();
             }
         }
-        public void PopulateWorlds(ComboBox worlds)
+        public void PopulateWorlds(ComboBox worlds, bool includeBackup = true)
         {
             worlds.Items.Clear();
             foreach (DictionaryEntry world in this.saves)
             {
+                if((string)world.Key == "backup" && !includeBackup)
+                {
+                    continue;
+                }
                 worlds.Items.Add(names[world.Key]);
             }
             worlds.SelectedIndex = 0;
@@ -76,16 +102,47 @@ namespace Editor
             players.SelectedIndex = 0;
         }
 
+        public void SetWorking(bool working)
+        {
+            this.working = working;
+            DoLock();
+        }
         public void DoLock()
         {
-            if (manualCheck.Checked)
+            if(working)
+            {
+                transferButton.Enabled = false;
+                refreshButton.Enabled = false;
+                return;
+            }
+
+            refreshButton.Enabled = true;
+
+            if (manualMode.Checked)
             {
                 transferButton.Enabled = srcInput.Text.Length != 0 && dstInput.Text.Length != 0;
+            }
+            else if(nameMode.Checked)
+            {
+                transferButton.Enabled = srcNameInput.Text.Length != 0;
             }
             else
             {
                 transferButton.Enabled = ((srcWorld.SelectedIndex != dstWorld.SelectedIndex) || (srcPlayer.SelectedIndex != dstPlayer.SelectedIndex));
             }
+        }
+
+        public void DoVisible()
+        {
+            dstBox.Visible = defaultMode.Checked;
+            srcBox.Visible = defaultMode.Checked;
+            dstManualBox.Visible = manualMode.Checked;
+            srcManualBox.Visible = manualMode.Checked;
+            dstNameBox.Visible = nameMode.Checked;
+            srcNameBox.Visible = nameMode.Checked;
+
+            transferButton.Text = nameMode.Checked ? "Rename" : "Transfer";
+            DoLock();
         }
 
         public void DoTransfer()
@@ -103,10 +160,30 @@ namespace Editor
 
             this.transferCallback.Invoke(srcSave, dstSave);
         }
+        public void DoRename()
+        {
+            try
+            {
+                string dstSave = ((string[])this.saves[dstNameWorld.SelectedIndex])[0];
+                string worldFolder = Path.GetDirectoryName(Path.GetDirectoryName(dstSave));
+
+                string oldName = this.srcNamePlayer.Text;
+                string newName = this.srcNameInput.Text;
+
+                this.renameCallback.Invoke(worldFolder, oldName, newName);
+            }
+            catch { }
+
+        }
 
         public void DoRefresh()
         {
             this.refreshCallback.Invoke();
+        }
+
+        public void DoOpen(string type)
+        {
+            this.openCallback.Invoke(type);
         }
 
         delegate void DoCloseCallback();
@@ -144,15 +221,37 @@ namespace Editor
             PopulatePlayers(srcPlayer, srcWorld.SelectedIndex);
         }
 
+        private void dstNameWorld_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            PopulatePlayers(srcNamePlayer, dstNameWorld.SelectedIndex);
+        }
+
         private void transferButton_Click(object sender, EventArgs e)
         {
-            if (manualCheck.Checked)
+            if (manualMode.Checked)
             {
-                DoManualTransfer();
+                var result = MessageBox.Show("Transferring will modify the player save file. A backup will be created.\nContinue?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    DoManualTransfer();
+                }
+                
+            }
+            else if(nameMode.Checked)
+            {
+                var result = MessageBox.Show("Renaming will modify the world save file. A world backup will be created.\nContinue?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    DoRename();
+                }
             }
             else
             {
-                DoTransfer();
+                var result = MessageBox.Show("Transferring will modify the player save file. A backup will be created.\nContinue?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    DoTransfer();
+                }
             }
         }
         
@@ -169,14 +268,6 @@ namespace Editor
         private void dstPlayer_SelectedIndexChanged(object sender, EventArgs e)
         {
             DoLock();
-        }
-
-        private void manualCheck_CheckedChanged(object sender, EventArgs e)
-        {
-            dstBox.Visible = !manualCheck.Checked;
-            srcBox.Visible = !manualCheck.Checked;
-            dstManualBox.Visible = manualCheck.Checked;
-            srcManualBox.Visible = manualCheck.Checked;
         }
 
         private void dstOpen_Click(object sender, EventArgs e)
@@ -215,6 +306,36 @@ namespace Editor
         private void srcInput_TextChanged(object sender, EventArgs e)
         {
             DoLock();
+        }
+
+        private void defaultMode_CheckedChanged(object sender, EventArgs e)
+        {
+            DoVisible();
+        }
+
+        private void manualMode_CheckedChanged(object sender, EventArgs e)
+        {
+            DoVisible();
+        }
+
+        private void nameMode_CheckedChanged(object sender, EventArgs e)
+        {
+            DoVisible();
+        }
+
+        private void srcNameInput_TextChanged(object sender, EventArgs e)
+        {
+            DoLock();
+        }
+
+        private void openSavesToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            DoOpen("saves");
+        }
+
+        private void openBackupsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            DoOpen("backups");
         }
     }
 }
