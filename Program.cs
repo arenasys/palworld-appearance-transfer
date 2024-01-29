@@ -48,6 +48,7 @@ namespace Editor
 
         public void DoTransfer(string srcFile, string dstFile)
         {
+            dialog.SetLabel("Transferring...");
             int saveType;
 
             byte[] srcSave = null;
@@ -60,6 +61,7 @@ namespace Editor
                 if (srcFile.EndsWith(".bak.sav"))
                 {
                     File.Copy(srcFile, dstFile, true);
+                    dialog.SetLabel("Restored");
                     return;
                 }
 
@@ -159,8 +161,6 @@ namespace Editor
             try
             {
                 dialog.SetLabel("Reading...");
-
-                Directory.CreateDirectory(this.dataFolder);
 
                 var uesave = Path.GetFullPath("uesave.exe");
                 if (!File.Exists(uesave))
@@ -301,6 +301,10 @@ namespace Editor
                 this.dataFolder = Path.Combine(appData, "PalTransfer");
                 this.tmpFolder = Path.Combine(this.dataFolder, "tmp");
                 this.backupFolder = Path.Combine(this.dataFolder, "backup");
+
+                Directory.CreateDirectory(this.dataFolder);
+                Directory.CreateDirectory(this.tmpFolder);
+                Directory.CreateDirectory(this.backupFolder);
 
                 this.saveFolder = "SaveGames";
                 if (!Directory.Exists(this.saveFolder))
